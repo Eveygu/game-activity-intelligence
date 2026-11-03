@@ -91,15 +91,35 @@ def classify(text):
             return category, subcategory
     return "待核验", "未归类官方资讯"
 
-def classify_channel(source, title, text):
+def classify_channel(source, title, text, author=""):
     if source.get("type") not in ("官方社区", "社区论坛"):
         return "官方动作"
-    # 只检查帖子自身开头附近的作者信息，避免被页面推荐区里的官方帖子误导
-    head = ((title or "") + " " + (text or "")[:420])
-    official_markers = r"官方版主|官方账号|官方运营|官方公告|ECC组委会|运营团队|官方\s*@|网易官方|官方人员"
-    if re.search(official_markers, head, re.I):
+    author = (author or "").strip()
+    if re.search(r"官方版主|官方账号|官方运营|官方人员|ECC组委会|运营团队", author, re.I):
         return "官方动作"
-    return "舆论信息"
+    if author:
+        return "舆论信息"
+    return "待核验"
+
+def extract_taptap_card(card):
+    link = card.select_one('a[href*="/moment/"]')
+    if not link:
+        return None
+    href = link.get("href", "")
+    title_node = card.select_one(".moment-article__title, .moment-card__title, .moment-summary-text__content, .moment-article__summary--content")
+    title = " ".join((title_node or link).get_text(" ", strip=True).split())
+    author_node = card.select_one(".user-name__text, [itemprop='name']")
+    author = " ".join(author_node.get_text(" ", strip=True).split()) if author_node else ""
+    moderator = card.select_one(".user-name__moderator-tag")
+    if moderator:
+        author = (author + " " + moderator.get_text(" ", strip=True)).strip()
+    time_node = card.select_one(".moment-card__time[title], time[datetime]")
+    published = (time_node.get("title") or time_node.get("datetime")) if time_node else ""
+    body_node = card.select_one(".moment-summary-text__content, .tap-rich-content__body, .moment-article__summary--content")
+    body = " ".join(body_node.get_text(" ", strip=True).split()) if body_node else title
+    context = "作者：" + author + " 发布时间：" + published + " 正文：" + body
+    return title[:180], href, context[:700]
+
 
 def load_json(path, default):
     try:
@@ -109,6 +129,17 @@ def load_json(path, default):
 
 def candidate_links(soup, base_url):
     found = []
+    if "taptap.cn" in urlparse(base_url).netloc and "/topic" in urlparse(base_url).path:
+        cards = soup.select(".moment-card.moment-feed-card, .moment-card--isfeed")
+        for card in cards:
+            parsed_card = extract_taptap_card(card)
+            if parsed_card:
+                title, href, context = parsed_card
+                href = clean_url(urljoin(base_url, href))
+                if title and len(title) >= 2:
+                    found.append((title, href, context))
+        if found:
+            return found
     for a in soup.select("a[href]"):
         title = " ".join(a.get_text(" ", strip=True).split())
         href = clean_url(urljoin(base_url, a.get("href", "")))
@@ -123,6 +154,7 @@ def candidate_links(soup, base_url):
         if KEYWORDS.search(title + " " + context) or re.search(r"/(news|notice|activity|event|topic|moment|article|detail|announcement)/", parsed.path, re.I):
             found.append((title, href, " ".join(context.split())[:700]))
     return found
+
 
 def fetch_page(session, url):
     response = session.get(url, timeout=TIMEOUT)
@@ -171,10 +203,21 @@ def main():
                     try:
                         detail_response, detail_soup = fetch_page(session, href)
                         status["details_read"] += 1
-                        main = detail_soup.select_one("article, .article-content, .news-content, .news_detail, .post-content, .detail-content, .content-detail, .article_body") or detail_soup.select_one("main") or detail_soup
-                        for noise in main.select("header, footer, nav, aside, script, style, .nav, .header, .footer, .breadcrumb, .share, .recommend, .related"):
-                            noise.decompose()
-                        detail_text = " ".join(main.get_text(" ", strip=True).split())[:3500]
+                        is_taptap = "taptap.cn" in urlparse(detail_url).netloc
+                        if is_taptap:
+                            main = detail_soup.select_one(".moment-detail, .moment-card, article[itemtype*='Article'], [itemprop='articleBody']") or detail_soup.select_one("main")
+                            if main:
+                                for noise in main.select(".moment-hot-comment, .moment-card-footer, .moment-recommend, .recommend, .related, .comment, header, footer, nav, script, style"):
+                                    noise.decompose()
+                                body_node = main.select_one("[itemprop='articleBody'], .tap-rich-content__body, .moment-article__summary--content, .moment-detail__content, .moment-card--content")
+                                detail_text = " ".join((body_node or main).get_text(" ", strip=True).split())[:3500]
+                            else:
+                                detail_text = context[:700]
+                        else:
+                            main = detail_soup.select_one("article, .article-content, .news-content, .news_detail, .post-content, .detail-content, .content-detail, .article_body") or detail_soup.select_one("main") or detail_soup
+                            for noise in main.select("header, footer, nav, aside, script, style, .nav, .header, .footer, .breadcrumb, .share, .recommend, .related"):
+                                noise.decompose()
+                            detail_text = " ".join(main.get_text(" ", strip=True).split())[:3500]
                         h = detail_soup.select_one("h1")
                         if h and h.get_text(" ", strip=True):
                             candidate_title = h.get_text(" ", strip=True)
@@ -183,6 +226,8 @@ def main():
                     except Exception as detail_error:
                         detail_text = context + " [详情页读取失败: " + str(detail_error)[:160] + "]"
                     combined = detail_title + " " + detail_text
+                    author_match = re.search(r"作者：(.+?) 发布时间：", context or "")
+                    author = author_match.group(1).strip() if author_match else ""
                     published, start_date, end_date = extract_dates(detail_soup or soup, combined)
                     # Many official game news URLs embed their publication date as /YYYYMMDD/.
                     if not published:
@@ -205,9 +250,10 @@ def main():
                         "published_at": published, "start_date": start_date, "end_date": end_date,
                         "age_days": age_days,
                         "historical_candidate": bool(age_days is not None and age_days > 180),
-                        "category": classify(detail_title + " " + detail_text[:1200])[0],
-                        "subcategory": classify(detail_title + " " + detail_text[:1200])[1],
-                        "channel": classify_channel(source, detail_title, detail_text),
+                        "category": classify(combined[:1800])[0],
+                        "subcategory": classify(combined[:1800])[1],
+                        "channel": classify_channel(source, detail_title, detail_text, author),
+                        "author": author or None,
                         "commercial_mechanism": None, "price": None,
                         "source_type": source["type"], "source_label": source["label"],
                         "url": detail_url, "evidence": detail_text[:1200],
