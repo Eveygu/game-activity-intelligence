@@ -85,7 +85,7 @@ def extract_dates(soup, text):
     # Activity dates are extracted only from text explicitly describing a period.
     start = end = None
     period_patterns = [
-        r"(?:活动时间|活动期间|开放时间|招募时间|报名时间|测试时间|活动日期)\s*[：:]?\s*([^。；;]{0,100}?)",
+        r"(?:活动时间|活动期间|开放时间|招募时间|报名时间|测试时间|活动日期)\s*[：:]?\s*([^。；;]{1,100})",
         r"(?:開催期間|実施期間|イベント期間)\s*[：:]?\s*([^。；;]{0,100}?)",
     ]
     period_text = ""
