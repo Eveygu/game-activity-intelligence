@@ -149,7 +149,9 @@ def main():
                     try:
                         detail_response, detail_soup = fetch_page(session, href)
                         status["details_read"] += 1
-                        main = detail_soup.select_one("article, main, .article, .content, .detail, .post-content") or detail_soup
+                        main = detail_soup.select_one("article, .article-content, .news-content, .news_detail, .post-content, .detail-content, .content-detail, .article_body") or detail_soup.select_one("main") or detail_soup
+                        for noise in main.select("header, footer, nav, aside, script, style, .nav, .header, .footer, .breadcrumb, .share, .recommend, .related"):
+                            noise.decompose()
                         detail_text = " ".join(main.get_text(" ", strip=True).split())[:3500]
                         h = detail_soup.select_one("h1")
                         if h and h.get_text(" ", strip=True):
@@ -160,6 +162,14 @@ def main():
                         detail_text = context + " [详情页读取失败: " + str(detail_error)[:160] + "]"
                     combined = detail_title + " " + detail_text
                     published, start_date, end_date = extract_dates(detail_soup or soup, combined)
+                    # Many official game news URLs embed their publication date as /YYYYMMDD/.
+                    if not published:
+                        url_date = re.search(r"/(20\\d{2})(\\d{2})(\\d{2})/", href)
+                        if url_date:
+                            try:
+                                published = datetime(*map(int, url_date.groups()), tzinfo=timezone.utc).date().isoformat()
+                            except ValueError:
+                                pass
                     age_days = None
                     if published:
                         try:
