@@ -66,13 +66,29 @@ def extract_dates(soup, text):
         end = parse_date(range_match.group(2))
     return published, start, end
 
-def classify(text):
+def classify(text, title=""):
+    title = title or ""
     text = text or ""
-    # 治理信息单独标记，避免混入核心运营分类
+    # 标题命中优先，避免详情页模板/推荐区关键词覆盖当前公告主题。
+    title_rules = [
+        ("游戏治理", "反外挂/封禁", r"反外挂|外挂打击|封禁名单|作弊处罚|违规账号|チート|不正行為"),
+        ("品牌营销", "IP联动", r"联动|コラボ"),
+        ("赛事电竞", "职业/官方赛事", r"赛事|比赛|电竞|eスポーツ|锦标赛"),
+        ("版本内容", "版本/玩法更新", r"アップデート|更新公告|维护公告|版本更新|玩法更新"),
+        ("商业化", "外观上新", r"皮肤|外观|时装|スキン"),
+        ("运营活动", "节日/主题活动", r"节日|周年庆|主题活动|季节活动"),
+        ("运营活动", "福利活动", r"福利|签到|登录奖励|免费领取|抽奖|评论赢|周边"),
+        ("运营活动", "限时运营活动", r"活动|キャンペーン|イベント|開催|招募|测试资格"),
+    ]
+    for category, subcategory, pattern in title_rules:
+        if re.search(pattern, title, re.I):
+            return category, subcategory
+    # 对日服官网，页面模板固定展示联动横幅，分类只采用公告标题。
+    if "コラボ" in text and not title:
+        return "待核验", "未归类官方资讯"
     if re.search(r"反外挂|外挂打击|封禁名单|作弊处罚|违规账号|チート|不正行為", text, re.I):
         return "游戏治理", "反外挂/封禁"
     rules = [
-        ("品牌营销", "IP联动", r"联动|コラボ"),
         ("品牌营销", "品牌合作", r"品牌合作|合作伙伴|コラボレーション"),
         ("品牌营销", "线下营销", r"线下|快闪|展台|线下活动"),
         ("赛事电竞", "职业/官方赛事", r"赛事|比赛|电竞|eスポーツ|锦标赛"),
@@ -92,6 +108,8 @@ def classify(text):
     return "待核验", "未归类官方资讯"
 
 def classify_channel(source, title, text, author=""):
+    if source.get("label") == "TapTap官方公告":
+        return "官方动作"
     if source.get("type") not in ("官方社区", "社区论坛"):
         return "官方动作"
     author = (author or "").strip()
@@ -205,14 +223,9 @@ def main():
                         status["details_read"] += 1
                         is_taptap = "taptap.cn" in urlparse(detail_url).netloc
                         if is_taptap:
-                            main = detail_soup.select_one(".moment-detail, .moment-card, article[itemtype*='Article'], [itemprop='articleBody']") or detail_soup.select_one("main")
-                            if main:
-                                for noise in main.select(".moment-hot-comment, .moment-card-footer, .moment-recommend, .recommend, .related, .comment, header, footer, nav, script, style"):
-                                    noise.decompose()
-                                body_node = main.select_one("[itemprop='articleBody'], .tap-rich-content__body, .moment-article__summary--content, .moment-detail__content, .moment-card--content")
-                                detail_text = " ".join((body_node or main).get_text(" ", strip=True).split())[:3500]
-                            else:
-                                detail_text = context[:700]
+                            # 列表卡片已提供当前帖子的独立正文/作者；详情页常含整个论坛推荐流，
+                            # 因此不再用详情页全量文本覆盖干净的卡片上下文。
+                            detail_text = context[:1200]
                         else:
                             main = detail_soup.select_one("article, .article-content, .news-content, .news_detail, .post-content, .detail-content, .content-detail, .article_body") or detail_soup.select_one("main") or detail_soup
                             for noise in main.select("header, footer, nav, aside, script, style, .nav, .header, .footer, .breadcrumb, .share, .recommend, .related"):
@@ -250,8 +263,8 @@ def main():
                         "published_at": published, "start_date": start_date, "end_date": end_date,
                         "age_days": age_days,
                         "historical_candidate": bool(age_days is not None and age_days > 180),
-                        "category": classify(combined[:1800])[0],
-                        "subcategory": classify(combined[:1800])[1],
+                        "category": classify(combined[:1800], detail_title)[0],
+                        "subcategory": classify(combined[:1800], detail_title)[1],
                         "channel": classify_channel(source, detail_title, detail_text, author),
                         "author": author or None,
                         "commercial_mechanism": None, "price": None,
