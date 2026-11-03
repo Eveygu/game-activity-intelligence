@@ -1,5 +1,5 @@
 {
-  "updated_at": "2026-11-03T07:34:43+00:00",
+  "updated_at": "2026-11-03T07:38:40+00:00",
   "sources": [
     {
       "game_id": "G001",
@@ -7,12 +7,13 @@
       "source_type": "官网",
       "source_label": "官网首页",
       "url": "https://hy.163.com/",
-      "checked_at": "2026-11-03T07:34:27+00:00",
+      "checked_at": "2026-11-03T07:37:14+00:00",
       "status": "success",
       "http_status": 200,
       "candidate_links": 16,
-      "details_read": 0,
+      "details_read": 16,
       "new_items": 0,
+      "refreshed_items": 16,
       "error": null
     },
     {
@@ -21,12 +22,13 @@
       "source_type": "官网公告",
       "source_label": "官网新闻",
       "url": "https://hy.163.com/news/index.html",
-      "checked_at": "2026-11-03T07:34:31+00:00",
+      "checked_at": "2026-11-03T07:37:28+00:00",
       "status": "success",
       "http_status": 200,
       "candidate_links": 12,
-      "details_read": 0,
+      "details_read": 12,
       "new_items": 0,
+      "refreshed_items": 12,
       "error": null
     },
     {
@@ -35,12 +37,13 @@
       "source_type": "官网",
       "source_label": "日服官网",
       "url": "https://www.knivesout.jp/",
-      "checked_at": "2026-11-03T07:34:32+00:00",
+      "checked_at": "2026-11-03T07:37:38+00:00",
       "status": "success",
       "http_status": 200,
       "candidate_links": 17,
-      "details_read": 0,
+      "details_read": 17,
       "new_items": 0,
+      "refreshed_items": 17,
       "error": null
     },
     {
@@ -49,12 +52,13 @@
       "source_type": "官网",
       "source_label": "官网首页",
       "url": "https://party.163.com/",
-      "checked_at": "2026-11-03T07:34:33+00:00",
+      "checked_at": "2026-11-03T07:37:53+00:00",
       "status": "success",
       "http_status": 200,
       "candidate_links": 24,
-      "details_read": 0,
+      "details_read": 19,
       "new_items": 0,
+      "refreshed_items": 20,
       "error": null
     },
     {
@@ -63,12 +67,13 @@
       "source_type": "官网",
       "source_label": "官网首页",
       "url": "http://race.163.com/",
-      "checked_at": "2026-11-03T07:34:36+00:00",
+      "checked_at": "2026-11-03T07:38:12+00:00",
       "status": "success",
       "http_status": 200,
       "candidate_links": 9,
-      "details_read": 0,
+      "details_read": 9,
       "new_items": 0,
+      "refreshed_items": 9,
       "error": null
     },
     {
@@ -77,12 +82,13 @@
       "source_type": "官方社区",
       "source_label": "TapTap官方公告",
       "url": "https://www.taptap.cn/app/206934/topic?type=official",
-      "checked_at": "2026-11-03T07:34:37+00:00",
+      "checked_at": "2026-11-03T07:38:21+00:00",
       "status": "success",
       "http_status": 200,
       "candidate_links": 2,
-      "details_read": 0,
+      "details_read": 2,
       "new_items": 0,
+      "refreshed_items": 2,
       "error": null
     },
     {
@@ -91,12 +97,13 @@
       "source_type": "官方社区",
       "source_label": "TapTap官方论坛",
       "url": "https://www.taptap.cn/app/944749/topic",
-      "checked_at": "2026-11-03T07:34:41+00:00",
+      "checked_at": "2026-11-03T07:38:28+00:00",
       "status": "success",
       "http_status": 200,
       "candidate_links": 8,
-      "details_read": 0,
+      "details_read": 8,
       "new_items": 0,
+      "refreshed_items": 8,
       "error": null
     }
   ]
