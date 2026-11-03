@@ -1,4 +1,89 @@
 {
-  "updated_at": null,
-  "sources": []
+  "updated_at": "2026-11-03T07:17:42+00:00",
+  "sources": [
+    {
+      "game_id": "G001",
+      "game_name": "荒野行动（国服）",
+      "source_type": "官网",
+      "source_label": "官网首页",
+      "url": "https://hy.163.com/",
+      "checked_at": "2026-11-03T07:17:27+00:00",
+      "status": "success",
+      "http_status": 200,
+      "items_found": 0,
+      "error": null
+    },
+    {
+      "game_id": "G001",
+      "game_name": "荒野行动（国服）",
+      "source_type": "官网公告",
+      "source_label": "官网新闻",
+      "url": "https://hy.163.com/news/index.html",
+      "checked_at": "2026-11-03T07:17:29+00:00",
+      "status": "success",
+      "http_status": 200,
+      "items_found": 0,
+      "error": null
+    },
+    {
+      "game_id": "G002",
+      "game_name": "荒野行动（日服）",
+      "source_type": "官网",
+      "source_label": "日服官网",
+      "url": "https://www.knivesout.jp/",
+      "checked_at": "2026-11-03T07:17:31+00:00",
+      "status": "success",
+      "http_status": 200,
+      "items_found": 0,
+      "error": null
+    },
+    {
+      "game_id": "G003",
+      "game_name": "蛋仔派对（国服）",
+      "source_type": "官网",
+      "source_label": "官网首页",
+      "url": "https://party.163.com/",
+      "checked_at": "2026-11-03T07:17:32+00:00",
+      "status": "success",
+      "http_status": 200,
+      "items_found": 0,
+      "error": null
+    },
+    {
+      "game_id": "G004",
+      "game_name": "王牌竞速",
+      "source_type": "官网",
+      "source_label": "官网首页",
+      "url": "http://race.163.com/",
+      "checked_at": "2026-11-03T07:17:34+00:00",
+      "status": "success",
+      "http_status": 200,
+      "items_found": 0,
+      "error": null
+    },
+    {
+      "game_id": "G005",
+      "game_name": "超凡先锋",
+      "source_type": "官方社区",
+      "source_label": "TapTap官方公告",
+      "url": "https://www.taptap.cn/app/206934/topic?type=official",
+      "checked_at": "2026-11-03T07:17:36+00:00",
+      "status": "success",
+      "http_status": 200,
+      "items_found": 2,
+      "error": null
+    },
+    {
+      "game_id": "G006",
+      "game_name": "极限战场",
+      "source_type": "官方社区",
+      "source_label": "TapTap官方论坛",
+      "url": "https://www.taptap.cn/app/944749/topic",
+      "checked_at": "2026-11-03T07:17:40+00:00",
+      "status": "success",
+      "http_status": 200,
+      "items_found": 1,
+      "error": null
+    }
+  ]
 }
