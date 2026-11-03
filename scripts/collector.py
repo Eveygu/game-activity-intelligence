@@ -240,7 +240,7 @@ def main():
                         detail_text = context + " [详情页读取失败: " + str(detail_error)[:160] + "]"
                     # 清理日服全站固定展示的联动横幅，避免污染摘要与证据。
                     if game.get("id") == "G002":
-                        detail_text = re.sub(r"(?:荒野行動[ｘx×]BLEACHコラボ\\s*)+", "", detail_text).strip()
+                        detail_text = re.sub(r"(?:荒野行動[ｘx×]BLEACHコラボ\s*)+", "", detail_text).strip()
                     combined = detail_title + " " + detail_text
                     # 日服分类只依据公告标题，避免站点模板污染。
                     classification_text = detail_title if game.get("id") == "G002" else combined
@@ -266,6 +266,8 @@ def main():
                     # 玩家帖子作为舆论信息单独保留，不参与运营/版本/商业化等官方动作分类。
                     if channel == "舆论信息":
                         category, subcategory = "待核验", "玩家讨论/反馈"
+                    elif channel == "官方动作" and game.get("id") == "G006" and re.search(r"开测|首测|二测|测试资格|招募|报名|预下载", detail_title):
+                        category, subcategory = "运营活动", "限时运营活动"
                     item = {
                         "id": hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:16],
                         "game_id": game["id"], "game_name": game["name"],
