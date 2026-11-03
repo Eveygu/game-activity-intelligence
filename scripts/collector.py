@@ -29,10 +29,12 @@ def iso(dt=None):
 def clean_url(url):
     return urldefrag(url)[0].rstrip("/")
 
-def parse_date(value):
+def parse_date(value, reference_year=None):
+    """Return a validated YYYY-MM-DD date; never substitute today's date."""
     if not value:
         return None
     value = str(value).strip()
+    # Full year first: 2026-11-03 / 2026年11月3日 / 20261103
     for pattern in DATE_PATTERNS:
         m = pattern.search(value)
         if m:
@@ -40,34 +42,78 @@ def parse_date(value):
                 y, mo, d = map(int, m.groups())
                 return datetime(y, mo, d, tzinfo=timezone.utc).date().isoformat()
             except ValueError:
-                pass
+                return None
+    # Month/day only is accepted only when an explicit reference year exists.
+    m = re.search(r"(?<!\\d)(\\d{1,2})[月./-](\\d{1,2})日?(?!\\d)", value)
+    if m and reference_year:
+        try:
+            return datetime(int(reference_year), int(m.group(1)), int(m.group(2)), tzinfo=timezone.utc).date().isoformat()
+        except ValueError:
+            return None
     return None
 
+def normalize_published(value):
+    """Normalize publication date to YYYY-MM-DD, preserving no guessed timezone."""
+    if not value:
+        return None
+    raw = str(value).strip()
+    parsed = parse_date(raw)
+    return parsed
+
 def extract_dates(soup, text):
+    # Publication time must be explicitly identified as publication metadata.
     published = None
-    for selector, attr in [
-        ('meta[property="article:published_time"]', "content"),
-        ('meta[name="pubdate"]', "content"),
-        ('meta[name="publishdate"]', "content"),
-        ('meta[name="date"]', "content"),
-        ("time[datetime]", "datetime"),
-    ]:
-        node = soup.select_one(selector)
-        if node:
-            published = node.get(attr)
-            if published:
-                break
-    published = published or None
-    if not published:
-        card_time = re.search(r"发布时间\s*[：:]\s*((?:20\d{2})[年./-]\s?\d{1,2}[月./-]\s?\d{1,2}日?(?:\s+\d{1,2}:\d{2}(?::\d{2})?)?)", text or "")
-        if card_time:
-            published = card_time.group(1)
-    start = None
-    end = None
-    range_match = re.search(r"((?:20\d{2}[年./-])?\s?\d{1,2}[月./-]\s?\d{1,2}日?)\s*(?:至|到|~|～|—|-|〜)\s*((?:20\d{2}[年./-])?\s?\d{1,2}[月./-]\s?\d{1,2}日?)", text)
+    card_time = re.search(
+        r"发布时间\\s*[：:]\\s*((?:20\\d{2})[年./-]\\s?\\d{1,2}[月./-]\\s?\\d{1,2}日?(?:\\s+\\d{1,2}:\\d{2}(?::\\d{2})?)?|20\\d{2}\\d{4})",
+        text or ""
+    )
+    if card_time:
+        published = normalize_published(card_time.group(1))
+    if not published and soup:
+        for selector, attr in [
+            ('meta[property="article:published_time"]', "content"),
+            ('meta[name="pubdate"]', "content"),
+            ('meta[name="publishdate"]', "content"),
+            ('meta[name="date"]', "content"),
+        ]:
+            node = soup.select_one(selector)
+            if node:
+                published = normalize_published(node.get(attr))
+                if published:
+                    break
+
+    # Activity dates are extracted only from text explicitly describing a period.
+    start = end = None
+    period_patterns = [
+        r"(?:活动时间|活动期间|开放时间|招募时间|报名时间|测试时间|活动日期)\\s*[：:]?\\s*([^。；;]{0,100}?)",
+        r"(?:開催期間|実施期間|イベント期間)\\s*[：:]?\\s*([^。；;]{0,100}?)",
+    ]
+    period_text = ""
+    for pattern in period_patterns:
+        match = re.search(pattern, text or "", re.I)
+        if match:
+            period_text = match.group(1)
+            break
+    if not period_text:
+        # A range alone is not enough evidence; require nearby activity wording.
+        match = re.search(r"(?:活动|测试|开放|開催|イベント)[^。；;]{0,50}", text or "", re.I)
+        period_text = match.group(0) if match else ""
+    range_match = re.search(
+        r"((?:20\\d{2}[年./-])?\\s?\\d{1,2}[月./-]\\s?\\d{1,2}日?)\\s*(?:至|到|~|～|—|–|〜)\\s*((?:20\\d{2}[年./-])?\\s?\\d{1,2}[月./-]\\s?\\d{1,2}日?)",
+        period_text
+    )
     if range_match:
-        start = parse_date(range_match.group(1))
-        end = parse_date(range_match.group(2))
+        reference_year = None
+        if published:
+            reference_year = int(published[:4])
+        start = parse_date(range_match.group(1), reference_year)
+        end = parse_date(range_match.group(2), reference_year)
+        # If the end month/day precedes the start, treat it as a year boundary.
+        if start and end and end < start and not re.search(r"20\\d{2}", range_match.group(2)):
+            try:
+                end = datetime(int(start[:4]) + 1, int(end[5:7]), int(end[8:10]), tzinfo=timezone.utc).date().isoformat()
+            except ValueError:
+                end = None
     return published, start, end
 
 def classify(text, title=""):
@@ -262,7 +308,7 @@ def main():
                     age_days = None
                     if published:
                         try:
-                            age_days = (now().date() - datetime.fromisoformat(published).date()).days
+                            age_days = (now().date() - datetime.fromisoformat(published[:10]).date()).days
                         except ValueError:
                             pass
                     category, subcategory = classify(classification_text[:1800], detail_title)
@@ -338,7 +384,7 @@ def main():
                 parsed_date = parse_date(card_time.group(1))
                 if parsed_date:
                     record["published_at"] = parsed_date
-                    record["age_days"] = (now().date() - datetime.fromisoformat(parsed_date).date()).days
+                    record["age_days"] = (now().date() - datetime.fromisoformat(parsed_date[:10]).date()).days
                     record["historical_candidate"] = record["age_days"] > 180
 
     data["updated_at"] = iso()
