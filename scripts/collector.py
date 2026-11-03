@@ -44,7 +44,7 @@ def parse_date(value, reference_year=None):
             except ValueError:
                 return None
     # Month/day only is accepted only when an explicit reference year exists.
-    m = re.search(r"(?<!\\d)(\\d{1,2})[月./-](\\d{1,2})日?(?!\\d)", value)
+    m = re.search(r"(?<!\d)(\d{1,2})[月./-](\d{1,2})日?(?!\d)", value)
     if m and reference_year:
         try:
             return datetime(int(reference_year), int(m.group(1)), int(m.group(2)), tzinfo=timezone.utc).date().isoformat()
@@ -64,7 +64,7 @@ def extract_dates(soup, text):
     # Publication time must be explicitly identified as publication metadata.
     published = None
     card_time = re.search(
-        r"发布时间\\s*[：:]\\s*((?:20\\d{2})[年./-]\\s?\\d{1,2}[月./-]\\s?\\d{1,2}日?(?:\\s+\\d{1,2}:\\d{2}(?::\\d{2})?)?|20\\d{2}\\d{4})",
+        r"发布时间\s*[：:]\s*((?:20\d{2})[年./-]\s?\d{1,2}[月./-]\s?\d{1,2}日?(?:\s+\d{1,2}:\d{2}(?::\d{2})?)?|20\d{2}\d{4})",
         text or ""
     )
     if card_time:
@@ -85,8 +85,8 @@ def extract_dates(soup, text):
     # Activity dates are extracted only from text explicitly describing a period.
     start = end = None
     period_patterns = [
-        r"(?:活动时间|活动期间|开放时间|招募时间|报名时间|测试时间|活动日期)\\s*[：:]?\\s*([^。；;]{0,100}?)",
-        r"(?:開催期間|実施期間|イベント期間)\\s*[：:]?\\s*([^。；;]{0,100}?)",
+        r"(?:活动时间|活动期间|开放时间|招募时间|报名时间|测试时间|活动日期)\s*[：:]?\s*([^。；;]{0,100}?)",
+        r"(?:開催期間|実施期間|イベント期間)\s*[：:]?\s*([^。；;]{0,100}?)",
     ]
     period_text = ""
     for pattern in period_patterns:
@@ -99,7 +99,7 @@ def extract_dates(soup, text):
         match = re.search(r"(?:活动|测试|开放|開催|イベント)[^。；;]{0,50}", text or "", re.I)
         period_text = match.group(0) if match else ""
     range_match = re.search(
-        r"((?:20\\d{2}[年./-])?\\s?\\d{1,2}[月./-]\\s?\\d{1,2}日?)\\s*(?:至|到|~|～|—|–|〜)\\s*((?:20\\d{2}[年./-])?\\s?\\d{1,2}[月./-]\\s?\\d{1,2}日?)",
+        r"((?:20\d{2}[年./-])?\s?\d{1,2}[月./-]\s?\d{1,2}日?)\s*(?:至|到|~|～|—|–|〜)\s*((?:20\d{2}[年./-])?\s?\d{1,2}[月./-]\s?\d{1,2}日?)",
         period_text
     )
     if range_match:
@@ -109,7 +109,7 @@ def extract_dates(soup, text):
         start = parse_date(range_match.group(1), reference_year)
         end = parse_date(range_match.group(2), reference_year)
         # If the end month/day precedes the start, treat it as a year boundary.
-        if start and end and end < start and not re.search(r"20\\d{2}", range_match.group(2)):
+        if start and end and end < start and not re.search(r"20\d{2}", range_match.group(2)):
             try:
                 end = datetime(int(start[:4]) + 1, int(end[5:7]), int(end[8:10]), tzinfo=timezone.utc).date().isoformat()
             except ValueError:
