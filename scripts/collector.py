@@ -57,7 +57,7 @@ def extract_dates(soup, text):
             published = node.get(attr)
             if published:
                 break
-    published = published or parse_date(text)
+    published = published or None
     start = None
     end = None
     range_match = re.search(r"((?:20\d{2}[年./-])?\s?\d{1,2}[月./-]\s?\d{1,2}日?)\s*(?:至|到|~|～|—|-|〜)\s*((?:20\d{2}[年./-])?\s?\d{1,2}[月./-]\s?\d{1,2}日?)", text)
