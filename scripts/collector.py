@@ -119,6 +119,7 @@ def main():
     data = load_json(DISCOVERY_FILE, {"updated_at": None, "items": []})
     items = data.get("items", [])
     known = {clean_url(x.get("url", "")) for x in items if x.get("url")}
+    existing_by_url = {clean_url(x.get("url", "")): x for x in items if x.get("url")}
     statuses = []
     additions = []
     session = requests.Session()
@@ -132,7 +133,7 @@ def main():
                 "source_type": source["type"], "source_label": source["label"],
                 "url": url, "checked_at": iso(), "status": "unknown",
                 "http_status": None, "candidate_links": 0, "details_read": 0,
-                "new_items": 0, "error": None
+                "new_items": 0, "refreshed_items": 0, "error": None
             }
             try:
                 response, soup = fetch_page(session, url)
@@ -141,8 +142,7 @@ def main():
                 status["candidate_links"] = len(links)
                 for title, href, context in links[:20]:
                     normalized = clean_url(href)
-                    if normalized in known:
-                        continue
+                    # Re-read known links as well, so metadata fixes backfill historical records.
                     detail_title, detail_text = title, context
                     detail_soup = None
                     detail_url = href
@@ -183,7 +183,7 @@ def main():
                         "published_at": published, "start_date": start_date, "end_date": end_date,
                         "age_days": age_days,
                         "historical_candidate": bool(age_days is not None and age_days > 180),
-                        "category": classify(combined),
+                        "category": classify(detail_title) if classify(detail_title) != "官方资讯" else classify(detail_text[:1000]),
                         "commercial_mechanism": None, "price": None,
                         "source_type": source["type"], "source_label": source["label"],
                         "url": detail_url, "evidence": detail_text[:1200],
@@ -191,9 +191,17 @@ def main():
                         "review_status": "疑似历史信息，待核验" if age_days is not None and age_days > 180 else "待人工核验",
                         "discovered_at": iso()
                     }
-                    additions.append(item)
-                    known.add(normalized)
-                    status["new_items"] += 1
+                    if normalized in existing_by_url:
+                        previous = existing_by_url[normalized]
+                        for key, value in item.items():
+                            if value is not None and value != "":
+                                previous[key] = value
+                        status["refreshed_items"] += 1
+                    else:
+                        additions.append(item)
+                        existing_by_url[normalized] = item
+                        known.add(normalized)
+                        status["new_items"] += 1
                     time.sleep(0.5)
                 status["status"] = "success"
             except Exception as exc:
@@ -206,10 +214,11 @@ def main():
     data["items"] = additions + items
     DISCOVERY_FILE.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     STATUS_FILE.write_text(json.dumps({"updated_at": iso(), "sources": statuses}, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    print("Sources checked: {}; successful: {}; failed: {}; detail pages read: {}; new candidates: {}".format(
+    print("Sources checked: {}; successful: {}; failed: {}; detail pages read: {}; new candidates: {}; existing records refreshed: {}".format(
         len(statuses), sum(s["status"] == "success" for s in statuses),
         sum(s["status"] == "failed" for s in statuses),
-        sum(s["details_read"] for s in statuses), len(additions)))
+        sum(s["details_read"] for s in statuses), len(additions),
+        sum(s["refreshed_items"] for s in statuses)))
     for s in statuses:
         print("{} | {} | {} | candidates={} | details={} | new={} | {}".format(
             s["game_id"], s["source_label"], s["status"], s["candidate_links"],
