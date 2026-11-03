@@ -78,7 +78,7 @@ def classify(text, title=""):
         ("商业化", "外观上新", r"皮肤|外观|时装|スキン"),
         ("运营活动", "节日/主题活动", r"节日|周年庆|主题活动|季节活动"),
         ("运营活动", "福利活动", r"福利|签到|登录奖励|免费领取|抽奖|评论赢|周边"),
-        ("运营活动", "限时运营活动", r"活动|キャンペーン|イベント|開催|招募|测试资格"),
+        ("运营活动", "限时运营活动", r"活动|キャンペーン|イベント|開催|招募|测试资格|开测|首测|二测|実況者|配信者|クリエイター|募集"),
     ]
     for category, subcategory, pattern in title_rules:
         if re.search(pattern, title, re.I):
@@ -107,8 +107,8 @@ def classify(text, title=""):
             return category, subcategory
     return "待核验", "未归类官方资讯"
 
-def classify_channel(source, title, text, author=""):
-    if source.get("label") == "TapTap官方公告":
+def classify_channel(source, title, text, author="", url=""):
+    if source.get("label") == "TapTap官方公告" or "/activities/lottery/" in (url or ""):
         return "官方动作"
     if source.get("type") not in ("官方社区", "社区论坛"):
         return "官方动作"
@@ -238,8 +238,11 @@ def main():
                                 detail_title = candidate_title[:180]
                     except Exception as detail_error:
                         detail_text = context + " [详情页读取失败: " + str(detail_error)[:160] + "]"
+                    # 清理日服全站固定展示的联动横幅，避免污染摘要与证据。
+                    if game.get("id") == "G002":
+                        detail_text = re.sub(r"(?:荒野行動[ｘx×]BLEACHコラボ\\s*)+", "", detail_text).strip()
                     combined = detail_title + " " + detail_text
-                    # 日服站点的全局导航固定展示联动横幅，分类不使用该站点详情正文。
+                    # 日服分类只依据公告标题，避免站点模板污染。
                     classification_text = detail_title if game.get("id") == "G002" else combined
                     author_match = re.search(r"作者：(.+?) 发布时间：", context or "")
                     author = author_match.group(1).strip() if author_match else ""
@@ -258,6 +261,11 @@ def main():
                             age_days = (now().date() - datetime.fromisoformat(published).date()).days
                         except ValueError:
                             pass
+                    category, subcategory = classify(classification_text[:1800], detail_title)
+                    channel = classify_channel(source, detail_title, detail_text, author, detail_url)
+                    # 玩家帖子作为舆论信息单独保留，不参与运营/版本/商业化等官方动作分类。
+                    if channel == "舆论信息":
+                        category, subcategory = "待核验", "玩家讨论/反馈"
                     item = {
                         "id": hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:16],
                         "game_id": game["id"], "game_name": game["name"],
@@ -265,9 +273,9 @@ def main():
                         "published_at": published, "start_date": start_date, "end_date": end_date,
                         "age_days": age_days,
                         "historical_candidate": bool(age_days is not None and age_days > 180),
-                        "category": classify(classification_text[:1800], detail_title)[0],
-                        "subcategory": classify(classification_text[:1800], detail_title)[1],
-                        "channel": classify_channel(source, detail_title, detail_text, author),
+                        "category": category,
+                        "subcategory": subcategory,
+                        "channel": channel,
                         "author": author or None,
                         "commercial_mechanism": None, "price": None,
                         "source_type": source["type"], "source_label": source["label"],
