@@ -108,7 +108,12 @@ def fetch_page(session, url):
     content_type = response.headers.get("content-type", "")
     if "html" not in content_type and "text" not in content_type:
         raise ValueError("页面不是可解析的 HTML 文本")
-    return response, BeautifulSoup(response.text, "html.parser")
+    # requests may guess an incorrect legacy encoding on Chinese game sites.
+    try:
+        response.encoding = response.apparent_encoding or "utf-8"
+    except Exception:
+        response.encoding = "utf-8"
+    return response, BeautifulSoup(response.content, "html.parser", from_encoding=response.encoding)
 
 def main():
     data = load_json(DISCOVERY_FILE, {"updated_at": None, "items": []})
@@ -146,9 +151,11 @@ def main():
                         status["details_read"] += 1
                         main = detail_soup.select_one("article, main, .article, .content, .detail, .post-content") or detail_soup
                         detail_text = " ".join(main.get_text(" ", strip=True).split())[:3500]
-                        h = detail_soup.select_one("h1") or detail_soup.select_one("title")
+                        h = detail_soup.select_one("h1")
                         if h and h.get_text(" ", strip=True):
-                            detail_title = h.get_text(" ", strip=True)[:180]
+                            candidate_title = h.get_text(" ", strip=True)
+                            if len(candidate_title) >= 5 and not re.search(r"官网|官方网站|首页|网站首页", candidate_title):
+                                detail_title = candidate_title[:180]
                     except Exception as detail_error:
                         detail_text = context + " [详情页读取失败: " + str(detail_error)[:160] + "]"
                     combined = detail_title + " " + detail_text
