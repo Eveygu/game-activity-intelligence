@@ -164,7 +164,7 @@ def main():
                     published, start_date, end_date = extract_dates(detail_soup or soup, combined)
                     # Many official game news URLs embed their publication date as /YYYYMMDD/.
                     if not published:
-                        url_date = re.search(r"/(20\\d{2})(\\d{2})(\\d{2})/", href)
+                        url_date = re.search(r"/(20\d{2})(\d{2})(\d{2})/", href)
                         if url_date:
                             try:
                                 published = datetime(*map(int, url_date.groups()), tzinfo=timezone.utc).date().isoformat()
