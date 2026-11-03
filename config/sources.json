@@ -1,0 +1,81 @@
+{
+  "games": [
+    {
+      "id": "G001",
+      "name": "荒野行动（国服）",
+      "region": "中国大陆",
+      "sources": [
+        {
+          "type": "官网",
+          "url": "https://hy.163.com/",
+          "label": "官网首页"
+        },
+        {
+          "type": "官网公告",
+          "url": "https://hy.163.com/news/index.html",
+          "label": "官网新闻"
+        }
+      ]
+    },
+    {
+      "id": "G002",
+      "name": "荒野行动（日服）",
+      "region": "日本",
+      "sources": [
+        {
+          "type": "官网",
+          "url": "https://www.knivesout.jp/",
+          "label": "日服官网"
+        }
+      ]
+    },
+    {
+      "id": "G003",
+      "name": "蛋仔派对（国服）",
+      "region": "中国大陆",
+      "sources": [
+        {
+          "type": "官网",
+          "url": "https://party.163.com/",
+          "label": "官网首页"
+        }
+      ]
+    },
+    {
+      "id": "G004",
+      "name": "王牌竞速",
+      "region": "中国大陆",
+      "sources": [
+        {
+          "type": "官网",
+          "url": "http://race.163.com/",
+          "label": "官网首页"
+        }
+      ]
+    },
+    {
+      "id": "G005",
+      "name": "超凡先锋",
+      "region": "中国大陆",
+      "sources": [
+        {
+          "type": "官方社区",
+          "url": "https://www.taptap.cn/app/206934/topic?type=official",
+          "label": "TapTap官方公告"
+        }
+      ]
+    },
+    {
+      "id": "G006",
+      "name": "极限战场",
+      "region": "中国大陆",
+      "sources": [
+        {
+          "type": "官方社区",
+          "url": "https://www.taptap.cn/app/944749/topic",
+          "label": "TapTap官方论坛"
+        }
+      ]
+    }
+  ]
+}
