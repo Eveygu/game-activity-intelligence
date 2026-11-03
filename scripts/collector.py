@@ -319,11 +319,21 @@ def main():
         if record.get("channel") == "舆论信息":
             record["category"] = "待核验"
             record["subcategory"] = "玩家讨论/反馈"
-        if record.get("game_id") == "G006" and record.get("channel") == "官方动作" and re.search(r"开测|首测|二测|测试资格|招募|报名|预下载", record_title):
-            record["category"] = "运营活动"
-            record["subcategory"] = "限时运营活动"
+        if record.get("game_id") == "G006" and record.get("channel") == "官方动作":
+            if re.search(r"封禁|作弊|反外挂|违规账号|封禁名单", record_title):
+                record["category"] = "游戏治理"
+                record["subcategory"] = "反外挂/封禁"
+            elif re.search(r"首测结束|测试结束|关服公告", record_title):
+                record["category"] = "待核验"
+                record["subcategory"] = "未归类官方资讯"
+            elif re.search(r"开测|首测|二测|测试资格|招募|报名|预下载", record_title):
+                record["category"] = "运营活动"
+                record["subcategory"] = "限时运营活动"
+        if record.get("category") == "官方资讯":
+            record["category"] = "待核验"
+            record["subcategory"] = "未归类官方资讯"
         if not record.get("published_at"):
-            card_time = re.search(r"发布时间\\s*[：:]\\s*((?:20\\d{2})[年./-]\\s?\\d{1,2}[月./-]\\s?\\d{1,2}日?(?:\\s+\\d{1,2}:\\d{2}(?::\\d{2})?)?)", record_summary)
+            card_time = re.search(r"发布时间\s*[：:]\s*((?:20\d{2})[年./-]\s?\d{1,2}[月./-]\s?\d{1,2}日?(?:\s+\d{1,2}:\d{2}(?::\d{2})?)?)", record_summary)
             if card_time:
                 parsed_date = parse_date(card_time.group(1))
                 if parsed_date:
