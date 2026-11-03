@@ -67,17 +67,39 @@ def extract_dates(soup, text):
     return published, start, end
 
 def classify(text):
+    text = text or ""
+    # 治理信息单独标记，避免混入核心运营分类
+    if re.search(r"反外挂|外挂打击|封禁名单|作弊处罚|违规账号|チート|不正行為", text, re.I):
+        return "游戏治理", "反外挂/封禁"
     rules = [
-        ("联动合作", r"联动|合作|コラボ"),
-        ("赛事展会", r"赛事|比赛|展会|线下|大会|eスポーツ"),
-        ("商业化上新", r"礼包|通行证|皮肤|外观|上新|商城|充值|販売|パス"),
-        ("版本更新", r"更新|版本|维护|アップデート|メンテナンス"),
-        ("运营活动", r"活动|福利|签到|キャンペーン|イベント|開催|抽奖|评论赢"),
+        ("品牌营销", "IP联动", r"联动|コラボ"),
+        ("品牌营销", "品牌合作", r"品牌合作|合作伙伴|コラボレーション"),
+        ("品牌营销", "线下营销", r"线下|快闪|展台|线下活动"),
+        ("赛事电竞", "职业/官方赛事", r"赛事|比赛|电竞|eスポーツ|锦标赛"),
+        ("商业化", "外观上新", r"皮肤|外观|时装|服装|武器外观|スキン"),
+        ("商业化", "付费礼包/直购", r"礼包|直购|充值|售价|价格|販売|ショップ"),
+        ("商业化", "通行证/赛季付费", r"通行证|赛季手册|战令|パス"),
+        ("版本内容", "版本/玩法更新", r"版本|玩法|新地图|新模式|アップデート"),
+        ("版本内容", "平衡性调整", r"平衡性|数值调整|调整说明|武器调整"),
+        ("版本内容", "维护修复", r"维护|修复|停服|更新公告|メンテナンス"),
+        ("运营活动", "节日/主题活动", r"节日|周年庆|主题活动|季节活动"),
+        ("运营活动", "福利活动", r"福利|签到|登录奖励|免费领取|抽奖|评论赢|周边"),
+        ("运营活动", "限时运营活动", r"活动|キャンペーン|イベント|開催|招募|测试资格"),
     ]
-    for label, pattern in rules:
+    for category, subcategory, pattern in rules:
         if re.search(pattern, text, re.I):
-            return label
-    return "官方资讯"
+            return category, subcategory
+    return "待核验", "未归类官方资讯"
+
+def classify_channel(source, title, text):
+    if source.get("type") not in ("官方社区", "社区论坛"):
+        return "官方动作"
+    # 只检查帖子自身开头附近的作者信息，避免被页面推荐区里的官方帖子误导
+    head = ((title or "") + " " + (text or "")[:420])
+    official_markers = r"官方版主|官方账号|官方运营|官方公告|ECC组委会|运营团队|官方\s*@|网易官方|官方人员"
+    if re.search(official_markers, head, re.I):
+        return "官方动作"
+    return "舆论信息"
 
 def load_json(path, default):
     try:
@@ -183,7 +205,9 @@ def main():
                         "published_at": published, "start_date": start_date, "end_date": end_date,
                         "age_days": age_days,
                         "historical_candidate": bool(age_days is not None and age_days > 180),
-                        "category": classify(detail_title) if classify(detail_title) != "官方资讯" else classify(detail_text[:1000]),
+                        "category": classify(detail_title + " " + detail_text[:1200])[0],
+                        "subcategory": classify(detail_title + " " + detail_text[:1200])[1],
+                        "channel": classify_channel(source, detail_title, detail_text),
                         "commercial_mechanism": None, "price": None,
                         "source_type": source["type"], "source_label": source["label"],
                         "url": detail_url, "evidence": detail_text[:1200],
