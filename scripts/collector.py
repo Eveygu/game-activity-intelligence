@@ -61,10 +61,10 @@ def normalize_published(value):
     return parsed
 
 def extract_dates(soup, text):
-    # Publication time must be explicitly identified as publication metadata.
+    # Publication date: only accept explicitly labelled publication metadata.
     published = None
     card_time = re.search(
-        r"发布时间\s*[：:]\s*((?:20\d{2})[年./-]\s?\d{1,2}[月./-]\s?\d{1,2}日?(?:\s+\d{1,2}:\d{2}(?::\d{2})?)?|20\d{2}\d{4})",
+        r"发布时间\\s*[：:]\\s*((?:20\\d{2})[年./-]\\s?\\d{1,2}[月./-]\\s?\\d{1,2}日?(?:\\s+\\d{1,2}:\\d{2}(?::\\d{2})?)?|20\\d{2}\\d{4})",
         text or ""
     )
     if card_time:
@@ -82,38 +82,31 @@ def extract_dates(soup, text):
                 if published:
                     break
 
-    # Activity dates are extracted only from text explicitly describing a period.
+    # Activity periods require both a date range and nearby activity wording.
     start = end = None
-    period_patterns = [
-        r"(?:活动时间|活动期间|开放时间|招募时间|报名时间|测试时间|活动日期)\s*[：:]?\s*([^。；;]{1,100})",
-        r"(?:開催期間|実施期間|イベント期間)\s*[：:]?\s*([^。；;]{0,100}?)",
-    ]
-    period_text = ""
-    for pattern in period_patterns:
-        match = re.search(pattern, text or "", re.I)
-        if match:
-            period_text = match.group(1)
-            break
-    if not period_text:
-        # A range alone is not enough evidence; require nearby activity wording.
-        match = re.search(r"(?:活动|测试|开放|開催|イベント)[^。；;]{0,50}", text or "", re.I)
-        period_text = match.group(0) if match else ""
-    range_match = re.search(
-        r"((?:20\d{2}[年./-])?\s?\d{1,2}[月./-]\s?\d{1,2}日?)\s*(?:至|到|~|～|—|–|〜)\s*((?:20\d{2}[年./-])?\s?\d{1,2}[月./-]\s?\d{1,2}日?)",
-        period_text
+    source_text = re.sub(r"\\s+", " ", text or "")
+    date_token = r"(?:20\\d{2}\\s*[年./-]\\s*)?\\d{1,2}\\s*[月./-]\\s*\\d{1,2}日?"
+    range_re = re.compile(r"(" + date_token + r")\\s*(?:至|到|~|～|—|–|〜|-)\\s*(" + date_token + r")")
+    activity_context = re.compile(
+        r"活动|测试|开放|招募|报名|预约|上线|上架|售卖|发售|领取|兑换|比赛|赛事|赛程|持续时间|開催|実施|イベント|キャンペーン|販売|募集|受付|期間",
+        re.I
     )
-    if range_match:
-        reference_year = None
-        if published:
-            reference_year = int(published[:4])
-        start = parse_date(range_match.group(1), reference_year)
-        end = parse_date(range_match.group(2), reference_year)
-        # If the end month/day precedes the start, treat it as a year boundary.
-        if start and end and end < start and not re.search(r"20\d{2}", range_match.group(2)):
+    reference_year = int(published[:4]) if published else None
+    for match in range_re.finditer(source_text):
+        context = source_text[max(0, match.start()-100):min(len(source_text), match.end()+100)]
+        if not activity_context.search(context):
+            continue
+        candidate_start = parse_date(match.group(1), reference_year)
+        candidate_end = parse_date(match.group(2), reference_year)
+        if not candidate_start or not candidate_end:
+            continue
+        if candidate_end < candidate_start and not re.search(r"20\\d{2}", match.group(2)):
             try:
-                end = datetime(int(start[:4]) + 1, int(end[5:7]), int(end[8:10]), tzinfo=timezone.utc).date().isoformat()
+                candidate_end = datetime(int(candidate_start[:4])+1, int(candidate_end[5:7]), int(candidate_end[8:10]), tzinfo=timezone.utc).date().isoformat()
             except ValueError:
-                end = None
+                continue
+        start, end = candidate_start, candidate_end
+        break
     return published, start, end
 
 def classify(text, title=""):
@@ -378,14 +371,42 @@ def main():
         if record.get("category") == "官方资讯":
             record["category"] = "待核验"
             record["subcategory"] = "未归类官方资讯"
+        # Normalize legacy publication formats and backfill explicit activity periods.
+        existing_published = record.get("published_at")
+        normalized_published = normalize_published(existing_published)
+        if normalized_published:
+            record["published_at"] = normalized_published
+        elif existing_published:
+            record["published_at"] = None
         if not record.get("published_at"):
-            card_time = re.search(r"发布时间\s*[：:]\s*((?:20\d{2})[年./-]\s?\d{1,2}[月./-]\s?\d{1,2}日?(?:\s+\d{1,2}:\d{2}(?::\d{2})?)?)", record_summary)
+            card_time = re.search(
+                r"发布时间\\s*[：:]\\s*((?:20\\d{2})[年./-]\\s?\\d{1,2}[月./-]\\s?\\d{1,2}日?(?:\\s+\\d{1,2}:\\d{2}(?::\\d{2})?)?)",
+                record_summary or record.get("evidence", "")
+            )
             if card_time:
-                parsed_date = parse_date(card_time.group(1))
-                if parsed_date:
-                    record["published_at"] = parsed_date
-                    record["age_days"] = (now().date() - datetime.fromisoformat(parsed_date[:10]).date()).days
-                    record["historical_candidate"] = record["age_days"] > 180
+                record["published_at"] = normalize_published(card_time.group(1))
+        if record.get("published_at"):
+            record["age_days"] = (now().date() - datetime.fromisoformat(record["published_at"]).date()).days
+            record["historical_candidate"] = record["age_days"] > 180
+            if record["historical_candidate"]:
+                record["review_status"] = "疑似历史信息，待核验"
+        stored_text = " ".join([str(record.get("title") or ""), str(record.get("summary") or ""), str(record.get("evidence") or "")])
+        _, extracted_start, extracted_end = extract_dates(None, stored_text)
+        if extracted_start:
+            record["start_date"], record["end_date"] = extracted_start, extracted_end
+        # Fill missing information attributes conservatively.
+        if not record.get("channel"):
+            if record.get("source_label") == "TapTap官方公告" or "/activities/lottery/" in record_url:
+                record["channel"] = "官方动作"
+            elif record.get("source_type") not in ("官方社区", "社区论坛"):
+                record["channel"] = "官方动作"
+            elif re.search(r"官方版主|官方账号|官方运营|官方人员|ECC组委会|运营团队", str(record.get("author") or ""), re.I):
+                record["channel"] = "官方动作"
+            elif record.get("author"):
+                record["channel"] = "舆论信息"
+            else:
+                record["channel"] = "待核验"
+
 
     data["updated_at"] = iso()
     data["items"] = additions + items
