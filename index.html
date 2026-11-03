@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>游戏竞品活动情报</title>
+<style>
+:root{font-family:Inter,"PingFang SC","Microsoft YaHei",sans-serif;color:#182230;background:#f5f7fb}
+*{box-sizing:border-box}body{margin:0}header{background:#172b4d;color:white;padding:28px max(22px,calc((100vw - 1180px)/2))}
+h1{font-size:24px;margin:0 0 8px}.muted{color:#748094;font-size:13px}header .muted{color:#c7d1df}
+main{max-width:1180px;margin:24px auto;padding:0 18px}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.stat,.panel{background:white;border:1px solid #e5eaf1;border-radius:12px;padding:16px}.stat strong{display:block;font-size:26px;margin-top:6px}
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;margin:18px 0}.toolbar select,.toolbar input{border:1px solid #d8dfeb;border-radius:8px;padding:10px;background:white}
+.panel{margin-top:16px}.item{padding:15px 0;border-bottom:1px solid #edf0f5}.item:last-child{border:0}
+.item h3{font-size:16px;margin:0 0 7px}.item a{color:#2458a6;text-decoration:none}.meta{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0}.tag{font-size:12px;background:#eef3fb;color:#405779;border-radius:5px;padding:4px 7px}
+.status{display:grid;grid-template-columns:1fr auto auto;gap:10px;padding:9px 0;border-bottom:1px solid #edf0f5;font-size:13px}
+.bad{color:#b42318}.good{color:#16804a}.empty{padding:24px;text-align:center;color:#748094}
+@media(max-width:650px){.stats{grid-template-columns:1fr}.status{grid-template-columns:1fr auto}}
+</style></head>
+<body>
+<header><h1>游戏竞品活动情报</h1><div class="muted">每日自动检查公开官网与官方社区 · 候选信息需人工核验</div></header>
+<main>
+<div class="stats">
+<div class="stat"><span class="muted">发现记录</span><strong id="total">—</strong></div>
+<div class="stat"><span class="muted">信息源检查成功</span><strong id="healthy">—</strong></div>
+<div class="stat"><span class="muted">信息源检查失败</span><strong id="failed">—</strong></div>
+</div>
+<div class="toolbar">
+<select id="game"><option value="">全部游戏</option></select>
+<select id="category"><option value="">全部类型</option><option>运营活动</option><option>商业化上新</option><option>版本更新</option><option>联动合作</option><option>赛事展会</option><option>官方资讯</option></select>
+<input id="search" placeholder="搜索标题或摘要">
+</div>
+<section class="panel"><h2>最新发现</h2><div class="muted" id="updated">数据加载中…</div><div id="items"></div></section>
+<section class="panel"><h2>信息源运行状态</h2><div class="muted">失败表示本次未能读取，不代表没有新活动。</div><div id="sources"></div></section>
+</main>
+<script>
+let allItems=[],allSources=[];
+const $=id=>document.getElementById(id);
+function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+function render(){
+ const game=$("game").value,cat=$("category").value,q=$("search").value.toLowerCase();
+ const list=allItems.filter(x=>(!game||x.game_id===game)&&(!cat||x.category===cat)&&(!q||(x.title+" "+x.summary).toLowerCase().includes(q)));
+ $("items").innerHTML=list.length?list.map(x=>'<article class="item"><h3><a target="_blank" rel="noopener" href="'+esc(x.url)+'">'+esc(x.title)+'</a></h3><div class="muted">'+esc(x.game_name)+' · '+esc(x.source_label)+' · '+esc(x.discovered_at||"")+'</div><div class="meta"><span class="tag">'+esc(x.category)+'</span><span class="tag">'+esc(x.review_status)+'</span><span class="tag">置信度 '+Math.round((x.confidence||0)*100)+'%</span></div><div>'+esc(x.summary||"暂无摘要")+'</div></article>').join(""):'<div class="empty">暂无匹配记录。若信息源检查失败，请先查看下方运行状态。</div>';
+}
+async function load(){
+ try{
+ const [d,s]=await Promise.all([fetch("./data/discoveries.json?"+Date.now()),fetch("./data/source_status.json?"+Date.now())]);
+ if(!d.ok||!s.ok)throw Error("数据文件尚未发布");
+ const dj=await d.json(),sj=await s.json();allItems=dj.items||[];allSources=sj.sources||[];
+ $("total").textContent=allItems.length;$("healthy").textContent=allSources.filter(x=>x.status==="success").length;$("failed").textContent=allSources.filter(x=>x.status==="failed").length;
+ $("updated").textContent="数据更新时间："+(dj.updated_at||"尚未运行采集");
+ const games=[...new Map(allItems.map(x=>[x.game_id,{id:x.game_id,name:x.game_name}])).values()];
+ $("game").innerHTML='<option value="">全部游戏</option>'+games.map(g=>'<option value="'+esc(g.id)+'">'+esc(g.name)+'</option>').join("");
+ $("sources").innerHTML=allSources.map(x=>'<div class="status"><span>'+esc(x.game_name)+' · '+esc(x.source_label)+'<br><span class="muted">'+esc(x.url)+'</span>'+(x.error?'<br><span class="bad">'+esc(x.error)+'</span>':'')+'</span><b class="'+(x.status==="success"?"good":"bad")+'">'+(x.status==="success"?"成功":"失败")+'</b><span class="muted">'+esc(x.checked_at||"")+'</span></div>').join("")||'<div class="empty">尚无采集记录</div>';
+ render();
+ }catch(e){$("updated").textContent="暂时无法加载数据："+e.message+"。请先运行一次 GitHub Actions。";}
+}
+["game","category","search"].forEach(id=>$(id).addEventListener("input",render));load();
+</script></body></html>
