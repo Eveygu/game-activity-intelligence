@@ -58,6 +58,10 @@ def extract_dates(soup, text):
             if published:
                 break
     published = published or None
+    if not published:
+        card_time = re.search(r"发布时间\\s*[：:]\\s*((?:20\\d{2})[年./-]\\s?\\d{1,2}[月./-]\\s?\\d{1,2}日?(?:\\s+\\d{1,2}:\\d{2}(?::\\d{2})?)?)", text or "")
+        if card_time:
+            published = card_time.group(1)
     start = None
     end = None
     range_match = re.search(r"((?:20\d{2}[年./-])?\s?\d{1,2}[月./-]\s?\d{1,2}日?)\s*(?:至|到|~|～|—|-|〜)\s*((?:20\d{2}[年./-])?\s?\d{1,2}[月./-]\s?\d{1,2}日?)", text)
@@ -304,6 +308,28 @@ def main():
                 status["error"] = f"{type(exc).__name__}: {str(exc)[:300]}"
             statuses.append(status)
             time.sleep(1)
+
+    # 历史记录口径回填：修正此前已入库记录，不依赖源站本轮再次发现。
+    for record in items + additions:
+        record_url = record.get("url", "") or ""
+        record_title = record.get("title", "") or ""
+        record_summary = record.get("summary", "") or ""
+        if record.get("source_label") == "TapTap官方公告" or "/activities/lottery/" in record_url:
+            record["channel"] = "官方动作"
+        if record.get("channel") == "舆论信息":
+            record["category"] = "待核验"
+            record["subcategory"] = "玩家讨论/反馈"
+        if record.get("game_id") == "G006" and record.get("channel") == "官方动作" and re.search(r"开测|首测|二测|测试资格|招募|报名|预下载", record_title):
+            record["category"] = "运营活动"
+            record["subcategory"] = "限时运营活动"
+        if not record.get("published_at"):
+            card_time = re.search(r"发布时间\\s*[：:]\\s*((?:20\\d{2})[年./-]\\s?\\d{1,2}[月./-]\\s?\\d{1,2}日?(?:\\s+\\d{1,2}:\\d{2}(?::\\d{2})?)?)", record_summary)
+            if card_time:
+                parsed_date = parse_date(card_time.group(1))
+                if parsed_date:
+                    record["published_at"] = parsed_date
+                    record["age_days"] = (now().date() - datetime.fromisoformat(parsed_date).date()).days
+                    record["historical_candidate"] = record["age_days"] > 180
 
     data["updated_at"] = iso()
     data["items"] = additions + items
