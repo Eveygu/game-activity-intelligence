@@ -26,7 +26,8 @@ main{max-width:1180px;margin:24px auto;padding:0 18px}.stats{display:grid;grid-t
 </div>
 <div class="toolbar">
 <select id="game"><option value="">全部游戏</option></select>
-<select id="category"><option value="">全部类型</option><option>运营活动</option><option>商业化上新</option><option>版本更新</option><option>联动合作</option><option>赛事展会</option><option>官方资讯</option></select>
+<select id="channel"><option value="">全部信息属性</option><option>官方动作</option><option>舆论信息</option></select>
+<select id="category"><option value="">全部分类</option><option>运营活动</option><option>商业化</option><option>版本内容</option><option>品牌营销</option><option>赛事电竞</option><option>玩家舆论</option><option>待核验</option><option>游戏治理</option></select>
 <input id="search" placeholder="搜索标题或摘要">
 </div>
 <section class="panel"><h2>最新发现</h2><div class="muted" id="updated">数据加载中…</div><div id="items"></div></section>
@@ -37,9 +38,9 @@ let allItems=[],allSources=[];
 const $=id=>document.getElementById(id);
 function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 function render(){
- const game=$("game").value,cat=$("category").value,q=$("search").value.toLowerCase();
- const list=allItems.filter(x=>(!game||x.game_id===game)&&(!cat||x.category===cat)&&(!q||(x.title+" "+x.summary).toLowerCase().includes(q)));
- $("items").innerHTML=list.length?list.map(x=>'<article class="item"><h3><a target="_blank" rel="noopener" href="'+esc(x.url)+'">'+esc(x.title)+'</a></h3><div class="muted">'+esc(x.game_name)+' · '+esc(x.source_label)+' · '+esc(x.discovered_at||"")+'</div><div class="meta"><span class="tag">'+esc(x.category)+'</span><span class="tag">'+esc(x.review_status)+'</span><span class="tag">置信度 '+Math.round((x.confidence||0)*100)+'%</span></div><div>'+esc(x.summary||"暂无摘要")+'</div></article>').join(""):'<div class="empty">暂无匹配记录。若信息源检查失败，请先查看下方运行状态。</div>';
+ const game=$("game").value,cat=$("category").value,channel=$("channel").value,q=$("search").value.toLowerCase();
+ const list=allItems.filter(x=>(!game||x.game_id===game)&&(!cat||x.category===cat)&&(!channel||x.channel===channel)&&(!q||(x.title+" "+x.summary).toLowerCase().includes(q)));
+ $("items").innerHTML=list.length?list.map(x=>'<article class="item"><h3><a target="_blank" rel="noopener" href="'+esc(x.url)+'">'+esc(x.title)+'</a></h3><div class="muted">'+esc(x.game_name)+' · '+esc(x.source_label)+' · '+esc(x.discovered_at||"")+'</div><div class="meta"><span class="tag">'+esc(x.channel||"待识别")+"</span><span class=\"tag\">"+esc(x.category||"待核验")+" / "+esc(x.subcategory||"")+"</span><span class=\"tag\">"+esc(x.review_status)+"</span><span class="tag">置信度 '+Math.round((x.confidence||0)*100)+'%</span></div><div>'+esc(x.summary||"暂无摘要")+'</div></article>').join(""):'<div class="empty">暂无匹配记录。若信息源检查失败，请先查看下方运行状态。</div>';
 }
 async function load(){
  try{
@@ -54,5 +55,5 @@ async function load(){
  render();
  }catch(e){$("updated").textContent="暂时无法加载数据："+e.message+"。请先运行一次 GitHub Actions。";}
 }
-["game","category","search"].forEach(id=>$(id).addEventListener("input",render));load();
+["game","category","channel","search"].forEach(id=>$(id).addEventListener("input",render));load();
 </script></body></html>
