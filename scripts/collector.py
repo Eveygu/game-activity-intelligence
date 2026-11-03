@@ -239,6 +239,8 @@ def main():
                     except Exception as detail_error:
                         detail_text = context + " [详情页读取失败: " + str(detail_error)[:160] + "]"
                     combined = detail_title + " " + detail_text
+                    # 日服站点的全局导航固定展示联动横幅，分类不使用该站点详情正文。
+                    classification_text = detail_title if game.get("id") == "G002" else combined
                     author_match = re.search(r"作者：(.+?) 发布时间：", context or "")
                     author = author_match.group(1).strip() if author_match else ""
                     published, start_date, end_date = extract_dates(detail_soup or soup, combined)
@@ -263,8 +265,8 @@ def main():
                         "published_at": published, "start_date": start_date, "end_date": end_date,
                         "age_days": age_days,
                         "historical_candidate": bool(age_days is not None and age_days > 180),
-                        "category": classify(combined[:1800], detail_title)[0],
-                        "subcategory": classify(combined[:1800], detail_title)[1],
+                        "category": classify(classification_text[:1800], detail_title)[0],
+                        "subcategory": classify(classification_text[:1800], detail_title)[1],
                         "channel": classify_channel(source, detail_title, detail_text, author),
                         "author": author or None,
                         "commercial_mechanism": None, "price": None,
