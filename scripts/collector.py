@@ -64,7 +64,7 @@ def extract_dates(soup, text):
     # Publication date: only accept explicitly labelled publication metadata.
     published = None
     card_time = re.search(
-        r"发布时间\\s*[：:]\\s*((?:20\\d{2})[年./-]\\s?\\d{1,2}[月./-]\\s?\\d{1,2}日?(?:\\s+\\d{1,2}:\\d{2}(?::\\d{2})?)?|20\\d{2}\\d{4})",
+        r"发布时间\s*[：:]\s*((?:20\d{2})[年./-]\s?\d{1,2}[月./-]\s?\d{1,2}日?(?:\s+\d{1,2}:\d{2}(?::\d{2})?)?|20\d{6})",
         text or ""
     )
     if card_time:
@@ -82,11 +82,11 @@ def extract_dates(soup, text):
                 if published:
                     break
 
-    # Activity periods require both a date range and nearby activity wording.
+    # Activity periods require a date range and nearby activity wording.
     start = end = None
-    source_text = re.sub(r"\\s+", " ", text or "")
-    date_token = r"(?:20\\d{2}\\s*[年./-]\\s*)?\\d{1,2}\\s*[月./-]\\s*\\d{1,2}日?"
-    range_re = re.compile(r"(" + date_token + r")\\s*(?:至|到|~|～|—|–|〜|-)\\s*(" + date_token + r")")
+    source_text = re.sub(r"\s+", " ", text or "")
+    date_token = r"(?:20\d{2}\s*[年./-]\s*)?\d{1,2}\s*[月./-]\s*\d{1,2}日?"
+    range_re = re.compile(r"(" + date_token + r")\s*(?:至|到|~|～|—|–|〜|-)\s*(?:(20\d{2})[年./-]\s*)?(\d{1,2})\s*[月./-]\s*(\d{1,2})日?")
     activity_context = re.compile(
         r"活动|测试|开放|招募|报名|预约|上线|上架|售卖|发售|领取|兑换|比赛|赛事|赛程|持续时间|開催|実施|イベント|キャンペーン|販売|募集|受付|期間",
         re.I
@@ -96,11 +96,13 @@ def extract_dates(soup, text):
         context = source_text[max(0, match.start()-100):min(len(source_text), match.end()+100)]
         if not activity_context.search(context):
             continue
-        candidate_start = parse_date(match.group(1), reference_year)
-        candidate_end = parse_date(match.group(2), reference_year)
+        first = match.group(1)
+        second = (match.group(2) + "年" if match.group(2) else "") + match.group(3) + "月" + match.group(4) + "日"
+        candidate_start = parse_date(first, reference_year)
+        candidate_end = parse_date(second, reference_year)
         if not candidate_start or not candidate_end:
             continue
-        if candidate_end < candidate_start and not re.search(r"20\\d{2}", match.group(2)):
+        if candidate_end < candidate_start and not match.group(2):
             try:
                 candidate_end = datetime(int(candidate_start[:4])+1, int(candidate_end[5:7]), int(candidate_end[8:10]), tzinfo=timezone.utc).date().isoformat()
             except ValueError:
